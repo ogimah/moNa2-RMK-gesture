@@ -1,0 +1,127 @@
+[tasks.install-llvm-tools]
+install_crate = { rustup_component_name = "llvm-tools" }
+
+[tasks.flip-link]
+install_crate = { crate_name = "flip-link", binary = "flip-link", test_arg = ["-h"] }
+
+[tasks.build-central]
+command = "cargo"
+args = ["build", "--release", "--bin", "central"]
+dependencies = ["install-llvm-tools", "flip-link"]
+
+[tasks.build-peripheral]
+command = "cargo"
+args = ["build", "--release", "--bin", "peripheral"]
+dependencies = ["install-llvm-tools", "flip-link"]
+
+[tasks.build]
+dependencies = ["build-central", "build-peripheral"]
+
+[tasks.objcopy-central]
+install_crate = { crate_name = "cargo-binutils", binary = "cargo", test_arg = [
+    "objcopy",
+    "--help",
+] }
+command = "cargo"
+args = [
+    "objcopy",
+    "--release",
+    "--bin",
+    "central",
+    "--",
+    "-O",
+    "ihex",
+    "moNa2-central.hex",
+]
+dependencies = ["build-central"]
+
+[tasks.objcopy-peripheral]
+install_crate = { crate_name = "cargo-binutils", binary = "cargo", test_arg = [
+    "objcopy",
+    "--help",
+] }
+command = "cargo"
+args = [
+    "objcopy",
+    "--release",
+    "--bin",
+    "peripheral",
+    "--",
+    "-O",
+    "ihex",
+    "moNa2-peripheral.hex",
+]
+dependencies = ["build-peripheral"]
+
+[tasks.uf2-central]
+install_crate = { crate_name = "cargo-hex-to-uf2", binary = "cargo", test_arg = [
+    "hex-to-uf2",
+    "--help",
+] }
+command = "cargo"
+args = [
+    "hex-to-uf2",
+    "--input-path",
+    "moNa2-central.hex",
+    "--output-path",
+    "moNa2-central.uf2",
+    "--family",
+    "nrf52840",
+]
+dependencies = ["objcopy-central"]
+
+[tasks.uf2-peripheral]
+install_crate = { crate_name = "cargo-hex-to-uf2", binary = "cargo", test_arg = [
+    "hex-to-uf2",
+    "--help",
+] }
+command = "cargo"
+args = [
+    "hex-to-uf2",
+    "--input-path",
+    "moNa2-peripheral.hex",
+    "--output-path",
+    "moNa2-peripheral.uf2",
+    "--family",
+    "nrf52840",
+]
+dependencies = ["objcopy-peripheral"]
+
+[tasks.uf2]
+dependencies = ["uf2-central", "uf2-peripheral"]
+
+[tasks.flash-uf2.linux]
+script_runner = "bash"
+script = '''
+if grep -q -i "Microsoft" /proc/version; then
+    powershell.exe -ExecutionPolicy Bypass -File scripts/flash.ps1 -Uf2File "$(wslpath -w ${@})"
+else
+    echo "Flashing is not supported on this platform." >&2
+    exit 1
+fi
+'''
+
+[tasks.flash-uf2.windows]
+command = "powershell.exe"
+args = [
+    "-ExecutionPolicy", "Bypass",
+    "-File", "scripts/flash.ps1",
+    "-Uf2File", "${@}"
+]
+
+[tasks.flash-uf2.mac]
+command = "bash"
+args = ["scripts/flash.sh", "${@}"]
+
+[tasks.flash-central]
+command = "cargo"
+args = ["make", "flash-uf2", "moNa2-central.uf2"]
+dependencies = ["uf2-central"]
+
+[tasks.flash-peripheral]
+command = "cargo"
+args = ["make", "flash-uf2", "moNa2-peripheral.uf2"]
+dependencies = ["uf2-peripheral"]
+
+[tasks.flash]
+dependencies = ["flash-central", "flash-peripheral"]

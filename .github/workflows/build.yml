@@ -1,0 +1,59 @@
+name: Build RMK firmware
+on:
+  workflow_call:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches: [main, COROPIT]
+
+jobs:
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          fetch-depth: 0
+
+      - name: Install clang dependencies
+        run: sudo apt-get update && sudo apt-get install -y libclang-dev
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.96.0
+          targets: thumbv7em-none-eabihf
+          components: rust-src, rustfmt, llvm-tools
+
+      - name: Check configuration preservation and layout migration
+        run: python3 -m unittest discover -s tests -p 'test_*.py' -v
+
+      - name: Test gesture routing with real RMK on host
+        run: cargo test --locked --manifest-path tests/gesture-host/Cargo.toml --target x86_64-unknown-linux-gnu -- --test-threads=1
+
+      - name: Install tested firmware tools
+        run: |
+          cargo install --locked cargo-make --version 0.37.24
+          cargo install --locked flip-link --version 0.1.12
+          cargo install --locked cargo-binutils --version 0.4.0
+          cargo install --locked cargo-hex-to-uf2 --version 0.1.2
+
+      - name: Build UF2
+        run: cargo make uf2
+
+      - name: Check dependency lockfile was preserved
+        run: git diff --exit-code -- Cargo.lock
+
+      - name: Calculate hash
+        run: |
+          sha256sum *.uf2
+
+      - name: Assemble and verify distribution bundle
+        run: python3 scripts/package_distribution.py
+
+      - name: Upload complete distribution bundle
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          archive: false
+          path: dist/moNa2-*-bundle.zip
