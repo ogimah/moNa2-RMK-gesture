@@ -1,5 +1,14 @@
 # moNa2 — GT1 / GT2 / GT3 / ST
 
+## ダウンロード
+
+- **[純正トラックボール版ZIPをダウンロード](https://github.com/ogimah/moNa2-RMK-gesture/releases/latest/download/moNa2-stock-bundle.zip)**
+- **[COROPIT版ZIPをダウンロード](https://github.com/ogimah/moNa2-RMK-gesture/releases/latest/download/moNa2-COROPIT-bundle.zip)**
+
+左右のUF2・使い方・ライセンスをまとめたZIPです。GitHubへのログインは不要です。
+[配布ページ・更新内容を見る](https://github.com/ogimah/moNa2-RMK-gesture/releases/latest)
+
+
 roBaish / moNa2（Seeed XIAO nRF52840構成）向けの非公式RMKファームウェアです。
 Vial / Pipetteで、4方向ジェスチャ3組と縦スクロールトリガーを設定できます。
 
@@ -10,7 +19,7 @@ Vial / Pipetteで、4方向ジェスチャ3組と縦スクロールトリガー�
 | 純正 | moNa2-stock-bundle.zip | moNa2-central.uf2 | moNa2-peripheral.uf2 |
 | COROPIT換装 | moNa2-COROPIT-bundle.zip | moNa2-COROPIT-central.uf2 | moNa2-COROPIT-peripheral.uf2 |
 
-配布ZIPを展開してください。GitHubから取得する場合は、成功したActionsの **Artifacts** から選びます。
+上のダウンロードリンクから対応するZIPを取得し、展開してください。
 ZIPには左右のUF2、説明、変更内容、著作権・ライセンス表示、SHA256SUMSが入っています。
 
 ## 2. 書き込む
