@@ -67,11 +67,7 @@ GTを配置したレイヤーで、対応する仮想十字の上下左右にキ
 - GT1 / GT2 / GT3 / STと仮想十字12方向は未割り当てです。
 - エンコーダーはPageDown / PageUp。その他レイヤーでは透過です。
 
-## 出典・ライセンス
-
-基となる実装：[kot149/roBa-rmk](https://github.com/kot149/roBa-rmk)
-改変版・ソース：[ogimah/moNa2-RMK-gesture](https://github.com/ogimah/moNa2-RMK-gesture)
-キーボード基盤：[RMK](https://github.com/HaoboGu/rmk)
+## ライセンス・出展
 
 - この配布物のソースコミットと対象機種は **BUNDLE.json** に記載しています。
 - アプリケーションのMIT許諾文・原作者の著作権表示は **LICENSE-MIT.txt** に保持しています。
@@ -83,6 +79,10 @@ GTを配置したレイヤーで、対応する仮想十字の上下左右にキ
 - 変更内容は **CHANGES.md**。元作者や各提供元の公式ファームウェアではありません。
 
 再配布する場合は、説明・著作権・ライセンス表示を含むZIP全体を渡してください。
+
+基となる実装：[kot149/roBa-rmk](https://github.com/kot149/roBa-rmk)
+改変版・ソース：[ogimah/moNa2-RMK-gesture](https://github.com/ogimah/moNa2-RMK-gesture)
+キーボード基盤：[RMK](https://github.com/HaoboGu/rmk)
 
 ## 検証情報・ソースからのビルド
 
