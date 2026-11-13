@@ -48,6 +48,7 @@ jobs:
           run-id: ${{ steps.builds.outputs.stock_run }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
           path: firmware
+          skip-decompress: true
 
       - name: Download tested COROPIT bundle
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
@@ -56,6 +57,7 @@ jobs:
           run-id: ${{ steps.builds.outputs.coropit_run }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
           path: firmware
+          skip-decompress: true
 
       - name: Verify both bundles and their source commits
         env:
