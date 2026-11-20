@@ -1,15 +1,29 @@
 name: Build RMK firmware
+permissions:
+  contents: read
+  actions: read
+  checks: write
 on:
   workflow_call:
   workflow_dispatch:
   pull_request:
   push:
     branches: [main, COROPIT]
+    paths-ignore: ['firmware/**']
 
 jobs:
+  # build:
+  #   uses: haobogu/rmk/.github/workflows/user_build.yml@main
+  #   with:
+  #     keyboard_toml_path: "keyboard.toml"
+  #     vial_json_path: "vial.json"
 
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    env:
+      CARGO_BUILD_JOBS: 4
+      LIBCLANG_PATH: /usr/lib/llvm-18/lib
+      BINDGEN_EXTRA_CLANG_ARGS: -resource-dir=/usr/lib/llvm-18/lib/clang/18
     steps:
       - name: Checkout code
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
@@ -17,7 +31,7 @@ jobs:
           fetch-depth: 0
 
       - name: Install clang dependencies
-        run: sudo apt-get update && sudo apt-get install -y libclang-dev
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libclang-18-dev libclang-common-18-dev gcc-arm-none-eabi libnewlib-dev
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -32,6 +46,15 @@ jobs:
       - name: Test gesture routing with real RMK on host
         run: cargo test --locked --manifest-path tests/gesture-host/Cargo.toml --target x86_64-unknown-linux-gnu -- --test-threads=1
 
+      - name: Install pinned isolated test runner
+        run: |
+          curl -fL https://github.com/nextest-rs/nextest/releases/download/cargo-nextest-0.9.152/cargo-nextest-0.9.152-x86_64-unknown-linux-gnu.tar.gz -o /tmp/nextest.tar.gz
+          echo 'd039b43c3e0958441b6ad0a39c8884d018b3d2e8fb9928f209074b1100b5e17a  /tmp/nextest.tar.gz' | sha256sum -c -
+          tar -xzf /tmp/nextest.tar.gz -C "$HOME/.cargo/bin" cargo-nextest
+
+      - name: Test Vial overrides, flash reboot, and existing library behavior
+        run: bash tests/run_override_tests.sh
+
       - name: Install tested firmware tools
         run: |
           cargo install --locked cargo-make --version 0.37.24
@@ -40,7 +63,29 @@ jobs:
           cargo install --locked cargo-hex-to-uf2 --version 0.1.2
 
       - name: Build UF2
-        run: cargo make uf2
+        id: uf2
+        run: |
+          set -o pipefail
+          cargo make uf2 2>&1 | tee /tmp/uf2-build.log
+
+      - name: Expose compiler diagnostics through GitHub Checks API
+        if: failure() && steps.uf2.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/jobs" > /tmp/build-jobs.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          jobs = json.loads(Path('/tmp/build-jobs.json').read_text())['jobs']
+          job = next(job for job in jobs if job['name'] == 'build')
+          Path('/tmp/check-id').write_text(str(job['id']))
+          log = Path('/tmp/uf2-build.log').read_text()[-55000:]
+          output = {'output': {'title': 'UF2 compiler diagnostics', 'summary': 'Build failed; compiler output follows.', 'text': '```text\n' + log + '\n```'}}
+          Path('/tmp/compiler-diagnostics.json').write_text(json.dumps(output))
+          PY
+          check_id=$(cat /tmp/check-id)
+          gh api --method PATCH "repos/$GITHUB_REPOSITORY/check-runs/$check_id" --input /tmp/compiler-diagnostics.json > /dev/null
 
       - name: Check dependency lockfile was preserved
         run: git diff --exit-code -- Cargo.lock

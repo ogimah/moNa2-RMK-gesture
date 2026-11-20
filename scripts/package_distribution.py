@@ -90,7 +90,7 @@ def main():
     for name in binaries:
         validate_uf2(payload[name])
     commit = subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT).decode().strip()
-    bundle = {'variant':variant, 'commit':commit, 'source':'https://github.com/'+os.environ.get('GITHUB_REPOSITORY','ogimah/moNa2-RMK-gesture')+'/tree/'+commit, 'firmware':binaries, 'target':'Seeed XIAO nRF52840 / roBaish moNa2', 'cargo_lock_sha256':inventory['cargo_lock_sha256']}
+    bundle = {'variant':variant, 'commit':commit, 'source':'https://github.com/'+os.environ.get('GITHUB_REPOSITORY','ogimah/moNa2-RMK-gesture')+'/tree/'+commit, 'firmware':binaries, 'target':'moNa2 / Seeed XIAO nRF52840', 'cargo_lock_sha256':inventory['cargo_lock_sha256']}
     payload['BUNDLE.json'] = (json.dumps(bundle,ensure_ascii=False,indent=2)+'\n').encode()
     payload['SHA256SUMS'] = ''.join(f'{sha(data)}  {name}\n' for name,data in sorted(payload.items())).encode()
     dest = ROOT/'dist'/f'moNa2-{variant}-bundle.zip'

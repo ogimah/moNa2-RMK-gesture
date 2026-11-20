@@ -6,7 +6,7 @@ on:
       tag_name:
         description: "Release tag"
         required: true
-        default: "v1.0.0"
+        default: "v0.2.0"
 
 permissions:
   contents: write
@@ -94,15 +94,31 @@ jobs:
           ZIP全体を取得・展開してください。Centralが右、Peripheralが左です。
           詳しい設定方法はリポジトリ先頭の説明をご覧ください。
 
-          GT1・GT2・GT3とSTに対応。初期配列は標準、TD・マクロ・コンボは空です。
-          保存済みVial設定は初期値より優先されます。
+          GT1・GT2・GT3とSTに加え、Vialで編集できるKey Override（32枠）に対応しました。
+          エンコーダーのホイール出力対策も含みます。
+          初期配列は配布用標準、TD・マクロ・コンボ・Overrideは空です。
+
+          ## Key Overrideの設定
+
+          Enableだけでなく、Optionsの開始条件をONにしてください。
+          通常のCtrl＋テンキー数字をCtrl＋通常数字へ置換する例では、Optionsの上から3項目をONにします。
+          Ctrlを残すにはSuppressed modsを空にします。具体的な設定表はREADMEに記載しています。
+
+          RMK 0.9.0を使用し、設定方式はVialのままです。Rynkは無効です。
+          更新時に設定やペアリングが初期化される場合があるため、事前に .vil を保存してください。
+
+          ## 確認範囲
+
+          純正トラックボール版・COROPIT版の個人用設定で、Overrideと、以前暴走していた条件でのホイール停止を実機確認しました。
+          この配布用標準設定は、自動試験・左右UF2ビルド・ZIP内のライセンス／チェックサムを検証しています。
+          配布用初期配列そのものの実機確認とは区別しています。
           '''
           (Path(os.environ['RUNNER_TEMP'])/'release-notes.md').write_text(notes)
           PY
           gh release create "$TAG_NAME" \
             firmware/moNa2-stock-bundle.zip firmware/moNa2-COROPIT-bundle.zip \
             --target "$RELEASE_COMMIT" --draft \
-            --title "GT1–GT3 / ST 配布版 $TAG_NAME" \
+            --title "GT1–GT3 / ST / Key Override 配布版 $TAG_NAME" \
             --notes-file "$RUNNER_TEMP/release-notes.md"
           python3 - <<'PY'
           import json,os,subprocess

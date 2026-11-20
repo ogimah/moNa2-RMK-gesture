@@ -12,20 +12,22 @@ class DistributionTests(unittest.TestCase):
     def test_original_physical_layout_and_encoder_defaults(self):
         old = tomllib.loads((ROOT/'tests/fixtures/standard-keyboard.toml').read_text())
         new = tomllib.loads((ROOT/'keyboard.toml').read_text())
-        for before, after in zip(old['layer'],new['layer']):
+        for before, after in zip(old['layer'],new['keymap']['layer']):
             self.assertEqual(after['name'],before['name'])
             self.assertEqual(after['keys'].split()[:43],before['keys'].split()[:43])
             self.assertEqual(after['keys'].split()[43:],['No']*12)
             self.assertEqual(after['encoders'],before['encoders'])
-        self.assertEqual(len(new['layer']),8)
+        self.assertEqual(len(new['keymap']['layer']),8)
         self.assertEqual(new['layout']['rows'],5)
         self.assertEqual(new['layout']['cols'],11)
         self.assertEqual(new['behavior']['morse']['morses'],[])
         self.assertEqual(new['behavior']['macros']['macros'],[])
         self.assertEqual(new['behavior']['combo']['combos'],[])
+        self.assertEqual(new['rmk']['fork_max_num'],32)
+        self.assertNotIn('fork',new['behavior'])
         self.assertEqual(new['rmk']['morse_max_num'],32)
         self.assertEqual(new['rmk']['macro_space_size'],512)
-        for layer in new['layer']:
+        for layer in new['keymap']['layer']:
             self.assertFalse(re.search(r'TD\(|Macro\d+|User1[0-3]',layer['keys']))
         self.assertNotIn('one_shot',new['behavior'])
         self.assertFalse(new['storage'].get('clear_layout',False))
