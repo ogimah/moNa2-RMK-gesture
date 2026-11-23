@@ -28,7 +28,7 @@ class DistributionTests(unittest.TestCase):
         self.assertEqual(new['rmk']['morse_max_num'],32)
         self.assertEqual(new['rmk']['macro_space_size'],512)
         for layer in new['keymap']['layer']:
-            self.assertFalse(re.search(r'TD\(|Macro\d+|User1[0-3]',layer['keys']))
+            self.assertFalse(re.search(r'TD\(|Macro\d+|User1[0-8]',layer['keys']))
         self.assertNotIn('one_shot',new['behavior'])
         self.assertFalse(new['storage'].get('clear_layout',False))
         self.assertFalse(new['storage'].get('clear_storage',False))
@@ -38,7 +38,7 @@ class DistributionTests(unittest.TestCase):
         for name in ['src/gesture.rs','src/pointingproccontroller.rs','src/central.rs','src/peripheral.rs','vial.json','Cargo.toml','Cargo.lock','rust-toolchain.toml','memory.x']:
             self.assertEqual(hashlib.sha256((ROOT/name).read_bytes()).hexdigest(),baseline[name],name)
         v=json.loads((ROOT/'vial.json').read_text())
-        self.assertEqual([k['shortName'] for k in v['customKeycodes'][10:]],['GT1','GT2','GT3','ST'])
+        self.assertEqual([k['shortName'] for k in v['customKeycodes'][10:]],['GT1','GT2','GT3','ST','DD1+','DD1-','DD2+','DD2-','BN'])
         tracked=subprocess.check_output(['git','ls-files'],cwd=ROOT).decode().splitlines()
         self.assertFalse(any(p.endswith('.vil') or p.endswith('.uf2') for p in tracked))
         self.assertFalse((ROOT/'scripts/import_vial_defaults.py').exists())

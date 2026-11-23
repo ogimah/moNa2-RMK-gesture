@@ -1,4 +1,4 @@
-name: Publish downloadable firmware bundles
+name: Publish downloadable firmware bundle
 
 on:
   workflow_dispatch:
@@ -6,7 +6,11 @@ on:
       tag_name:
         description: "Release tag"
         required: true
-        default: "v0.2.0"
+        default: "v0.3.0"
+      publish:
+        description: "Publish after verifying the prepared draft"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -18,111 +22,89 @@ jobs:
     steps:
       - name: Checkout release tooling
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          fetch-depth: 0
 
-      - name: Select successful builds for both current branch tips
+      - name: Select tested unified build for this exact source commit
         id: builds
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          python3 - <<'PY'
+          python3 - <<'PYCODE'
           import json, os, subprocess
           repo = os.environ['GITHUB_REPOSITORY']
           def api(path):
               return json.loads(subprocess.check_output(['gh','api',f'repos/{repo}/{path}']))
-          output = []
-          for branch, key in [('main','stock'), ('COROPIT','coropit')]:
-              tip = api('commits/'+branch)['sha']
-              runs = api('actions/workflows/build.yml/runs?branch='+branch+'&status=success&per_page=10')['workflow_runs']
-              matched = [r for r in runs if r['head_sha'] == tip]
-              if not matched:
-                  raise SystemExit('Build the latest '+branch+' commit successfully before publishing')
-              output += [f'{key}_run={matched[0]["id"]}', f'{key}_sha={tip}']
+          tip = subprocess.check_output(['git','rev-parse','HEAD']).decode().strip()
+          runs = api('actions/workflows/build.yml/runs?status=success&per_page=30')['workflow_runs']
+          matched = [r for r in runs if r['head_sha'] == tip]
+          if not matched:
+              raise SystemExit('Build this exact source commit before publishing')
+          run = matched[0]
+          assets = api('actions/runs/'+str(run['id'])+'/artifacts')['artifacts']
+          assert len(assets) == 1 and assets[0]['name'] == 'moNa2-bundle.zip' and not assets[0]['expired']
           with open(os.environ['GITHUB_OUTPUT'],'a') as f:
-              f.write('\n'.join(output)+'\n')
-          PY
+              f.write(f"run={run['id']}\nsha={tip}\n")
+          PYCODE
 
-      - name: Download tested stock bundle
+      - name: Download tested unified bundle
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: moNa2-stock-bundle.zip
-          run-id: ${{ steps.builds.outputs.stock_run }}
+          name: moNa2-bundle.zip
+          run-id: ${{ steps.builds.outputs.run }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
           path: firmware
           skip-decompress: true
 
-      - name: Download tested COROPIT bundle
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: moNa2-COROPIT-bundle.zip
-          run-id: ${{ steps.builds.outputs.coropit_run }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          path: firmware
-          skip-decompress: true
-
-      - name: Verify both bundles and their source commits
+      - name: Verify complete bundle and source commit
         env:
-          STOCK_SHA: ${{ steps.builds.outputs.stock_sha }}
-          COROPIT_SHA: ${{ steps.builds.outputs.coropit_sha }}
+          SOURCE_SHA: ${{ steps.builds.outputs.sha }}
         run: |
-          python3 - <<'PY'
+          python3 - <<'PYCODE'
           import os, sys
           from pathlib import Path
           sys.path.insert(0,'scripts')
           from package_distribution import verify_archive
-          for variant, sha in [('stock',os.environ['STOCK_SHA']),('COROPIT',os.environ['COROPIT_SHA'])]:
-              path = Path('firmware') / ('moNa2-'+variant+'-bundle.zip')
-              bundle = verify_archive(path)
-              assert bundle['variant'] == variant and bundle['commit'] == sha
-              assert bundle['source'] == 'https://github.com/'+os.environ['GITHUB_REPOSITORY']+'/tree/'+sha
-          PY
+          bundle = verify_archive(Path('firmware/moNa2-bundle.zip'))
+          assert bundle['commit'] == os.environ['SOURCE_SHA']
+          assert bundle['source'] == 'https://github.com/'+os.environ['GITHUB_REPOSITORY']+'/tree/'+os.environ['SOURCE_SHA']
+          PYCODE
 
-      - name: Publish complete release
+      - name: Prepare complete draft and optionally publish
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG_NAME: ${{ inputs.tag_name }}
-          RELEASE_COMMIT: ${{ steps.builds.outputs.stock_sha }}
+          PUBLISH: ${{ inputs.publish }}
+          RELEASE_COMMIT: ${{ steps.builds.outputs.sha }}
         run: |
-          python3 - <<'PY'
-          import os
+          python3 - <<'PYCODE'
+          import hashlib, json, os, re, subprocess
           from pathlib import Path
-          notes = '''## ダウンロード
-
-          - 純正トラックボール：moNa2-stock-bundle.zip
-          - COROPIT：moNa2-COROPIT-bundle.zip
-
-          各ZIPに左右UF2、使い方、著作権・ライセンス表示、チェックサムを同梱しています。
-          ZIP全体を取得・展開してください。Centralが右、Peripheralが左です。
-          詳しい設定方法はリポジトリ先頭の説明をご覧ください。
-
-          GT1・GT2・GT3とSTに加え、Vialで編集できるKey Override（32枠）に対応しました。
-          エンコーダーのホイール出力対策も含みます。
-          初期配列は配布用標準、TD・マクロ・コンボ・Overrideは空です。
-
-          ## Key Overrideの設定
-
-          Enableだけでなく、Optionsの開始条件をONにしてください。
-          通常のCtrl＋テンキー数字をCtrl＋通常数字へ置換する例では、Optionsの上から3項目をONにします。
-          Ctrlを残すにはSuppressed modsを空にします。具体的な設定表はREADMEに記載しています。
-
-          RMK 0.9.0を使用し、設定方式はVialのままです。Rynkは無効です。
-          更新時に設定やペアリングが初期化される場合があるため、事前に .vil を保存してください。
-
-          ## 確認範囲
-
-          純正トラックボール版・COROPIT版の個人用設定で、Overrideと、以前暴走していた条件でのホイール停止を実機確認しました。
-          この配布用標準設定は、自動試験・左右UF2ビルド・ZIP内のライセンス／チェックサムを検証しています。
-          配布用初期配列そのものの実機確認とは区別しています。
-          '''
-          (Path(os.environ['RUNNER_TEMP'])/'release-notes.md').write_text(notes)
-          PY
-          gh release create "$TAG_NAME" \
-            firmware/moNa2-stock-bundle.zip firmware/moNa2-COROPIT-bundle.zip \
-            --target "$RELEASE_COMMIT" --draft \
-            --title "GT1–GT3 / ST / Key Override 配布版 $TAG_NAME" \
-            --notes-file "$RUNNER_TEMP/release-notes.md"
-          python3 - <<'PY'
-          import json,os,subprocess
-          data=json.loads(subprocess.check_output(['gh','release','view',os.environ['TAG_NAME'],'--json','assets']))
-          assert {a['name'] for a in data['assets']} == {'moNa2-stock-bundle.zip','moNa2-COROPIT-bundle.zip'}
-          PY
-          gh release edit "$TAG_NAME" --draft=false --latest
+          tag = os.environ['TAG_NAME']
+          assert re.fullmatch(r'v[0-9]+\.[0-9]+\.[0-9]+',tag)
+          asset = Path('firmware/moNa2-bundle.zip')
+          fields = 'assets,isDraft,targetCommitish,url'
+          existing = subprocess.run(['gh','release','view',tag,'--json',fields],capture_output=True,text=True)
+          if existing.returncode:
+              subprocess.run(['gh','release','create',tag,str(asset),'--target',os.environ['RELEASE_COMMIT'],'--draft','--title','moNa2 統合版 '+tag,'--notes-file','.github/release-notes.md'],check=True)
+              data = json.loads(subprocess.check_output(['gh','release','view',tag,'--json',fields]))
+          else:
+              data = json.loads(existing.stdout)
+          assert data['isDraft'] and data['targetCommitish'] == os.environ['RELEASE_COMMIT']
+          assert len(data['assets']) == 1
+          attached = data['assets'][0]
+          assert attached['name'] == asset.name and attached['size'] == asset.stat().st_size
+          # Reuse a draft only if its attached bytes match the tested bundle.
+          review = Path(os.environ['RUNNER_TEMP'])/'draft-review'
+          review.mkdir()
+          subprocess.run(['gh','release','download',tag,'--pattern',asset.name,'--dir',str(review)],check=True)
+          assert hashlib.sha256((review/asset.name).read_bytes()).digest() == hashlib.sha256(asset.read_bytes()).digest()
+          print(data['url'])
+          if os.environ['PUBLISH'].lower() != 'true':
+              raise SystemExit(0)
+          # Fast-forward only: a concurrent incompatible main update must fail.
+          subprocess.run(['git','fetch','origin','main'],check=True)
+          subprocess.run(['git','merge-base','--is-ancestor','origin/main',os.environ['RELEASE_COMMIT']],check=True)
+          subprocess.run(['git','push','origin',os.environ['RELEASE_COMMIT']+':refs/heads/main'],check=True)
+          subprocess.run(['gh','release','edit',tag,'--draft=false','--latest'],check=True)
+          PYCODE

@@ -50,7 +50,8 @@ class ConfigurationTests(unittest.TestCase):
     def test_vial_coordinates_and_custom_codes_preserved(self):
         old = json.loads(original("vial.json"))
         new = json.loads((ROOT / "vial.json").read_text())
-        self.assertEqual([x["name"] for x in new["customKeycodes"][9:]], ["CLR_PEER", "GT1", "GT2", "GT3", "ST"])
+        self.assertEqual([x["name"] for x in new["customKeycodes"][9:]], ["CLR_PEER", "GT1", "GT2", "GT3", "ST", "DD1+", "DD1-", "DD2+", "DD2-", "BN_APPLY"])
+        self.assertEqual(new["layouts"]["labels"], [["Trackball", "Stock", "COROPIT"]])
         self.assertEqual(new["matrix"], {"rows": 5, "cols": 11})
         self.assertEqual(new["customKeycodes"][:9], old["customKeycodes"])
         self.assertEqual(new["layouts"]["keymap"][:-3], old["layouts"]["keymap"])
@@ -70,6 +71,7 @@ class ConfigurationTests(unittest.TestCase):
         self.assertIn("PeripheralMatrixConfig",source)
         self.assertIn(".with_host_service(&host_service)",source)
         self.assertIn("BleTransport::new",source)
+        self.assertLess(source.index("storage.usb_config_with_saved_name"), source.index("UsbTransport::new(driver, usb_config)"))
 
 
 if __name__ == "__main__":

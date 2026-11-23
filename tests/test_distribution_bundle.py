@@ -44,11 +44,11 @@ class DistributionBundleTests(unittest.TestCase):
         data={f:(ROOT/f).read_bytes() for f in pkg.FILES}
         binaries=['moNa2-central.uf2','moNa2-peripheral.uf2']
         for n in binaries:data[n]=fixture_uf2()
-        data['BUNDLE.json']=json.dumps({'firmware':binaries}).encode()
+        data['BUNDLE.json']=json.dumps({'variant':'unified','trackballs':['Stock','COROPIT'],'default_trackball':'Stock','firmware':binaries}).encode()
         data['SHA256SUMS']=''.join(f'{pkg.sha(v)}  {n}\n' for n,v in sorted(data.items())).encode()
         def write(path,content):
             with zipfile.ZipFile(path,'w') as z:
-                for n,b in content.items():z.writestr('moNa2-stock/'+n,b)
+                for n,b in content.items():z.writestr('moNa2/'+n,b)
         with tempfile.TemporaryDirectory() as d:
             p=Path(d)/'bundle.zip';write(p,data);pkg.verify_archive(p)
             bad=dict(data);bad['README.md']+=b'changed';write(p,bad)

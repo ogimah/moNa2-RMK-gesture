@@ -59,8 +59,13 @@ def verify_archive(path):
             if sha(z.read(base+name)) != digest:
                 raise ValueError('Checksum mismatch: '+name)
         bundle = json.loads(z.read(base+'BUNDLE.json'))
+        if (bundle.get('variant') != 'unified'
+                or bundle.get('trackballs') != ['Stock', 'COROPIT']
+                or bundle.get('default_trackball') != 'Stock'
+                or base != 'moNa2/'):
+            raise ValueError('Expected the unified Stock/COROPIT distribution')
         binaries = sorted(n[len(base):] for n in names if n.endswith('.uf2'))
-        if binaries != sorted(bundle['firmware']):
+        if binaries != ['moNa2-central.uf2', 'moNa2-peripheral.uf2'] or binaries != sorted(bundle['firmware']):
             raise ValueError('Unexpected firmware images')
         for n in binaries:
             validate_uf2(z.read(base+n))
@@ -82,20 +87,24 @@ def main():
     if resolved != documented:
         raise ValueError('Resolved dependencies changed: refresh the license inventory first')
     sensor = tomllib.loads((ROOT/'keyboard.toml').read_text())['split']['central']['input_device']['pmw3610'][0]
-    coropit = sensor.get('invert_x', False) and not sensor.get('invert_y', False)
-    variant = 'COROPIT' if coropit else 'stock'
-    prefix = 'moNa2-COROPIT' if coropit else 'moNa2'
+    if sensor.get("invert_x", False) or not sensor.get("invert_y", False):
+        raise ValueError("Unified firmware must keep the verified stock hardware orientation")
+    definition = json.loads((ROOT/"vial.json").read_text())
+    if definition["layouts"]["labels"] != [["Trackball", "Stock", "COROPIT"]]:
+        raise ValueError("Missing runtime trackball selector")
+    variant = "unified"
+    prefix = "moNa2"
     binaries = [prefix+'-central.uf2', prefix+'-peripheral.uf2']
     payload = {f:(ROOT/f).read_bytes() for f in FILES+binaries}
     for name in binaries:
         validate_uf2(payload[name])
     commit = subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT).decode().strip()
-    bundle = {'variant':variant, 'commit':commit, 'source':'https://github.com/'+os.environ.get('GITHUB_REPOSITORY','ogimah/moNa2-RMK-gesture')+'/tree/'+commit, 'firmware':binaries, 'target':'moNa2 / Seeed XIAO nRF52840', 'cargo_lock_sha256':inventory['cargo_lock_sha256']}
+    bundle = {'variant':variant, 'trackballs':['Stock','COROPIT'], 'default_trackball':'Stock', 'commit':commit, 'source':'https://github.com/'+os.environ.get('GITHUB_REPOSITORY','ogimah/moNa2-RMK-gesture')+'/tree/'+commit, 'firmware':binaries, 'target':'moNa2 / Seeed XIAO nRF52840', 'cargo_lock_sha256':inventory['cargo_lock_sha256']}
     payload['BUNDLE.json'] = (json.dumps(bundle,ensure_ascii=False,indent=2)+'\n').encode()
     payload['SHA256SUMS'] = ''.join(f'{sha(data)}  {name}\n' for name,data in sorted(payload.items())).encode()
-    dest = ROOT/'dist'/f'moNa2-{variant}-bundle.zip'
+    dest = ROOT/'dist'/'moNa2-bundle.zip'
     dest.parent.mkdir(exist_ok=True)
-    base = f'moNa2-{variant}/'
+    base = 'moNa2/'
     with zipfile.ZipFile(dest,'w',compression=zipfile.ZIP_DEFLATED,compresslevel=9) as z:
         for name,data in sorted(payload.items()):
             info = zipfile.ZipInfo(base+name, date_time=(2026,1,1,0,0,0))

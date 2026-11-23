@@ -572,7 +572,8 @@ impl<'a> KeyMap<'a> {
         self.inner.borrow_mut().set_default_layer(layer_num);
     }
 
-    pub(crate) fn layout_option(&self) -> u32 {
+    /// Current VIA/Vial layout options, including live host edits.
+    pub fn layout_option(&self) -> u32 {
         self.inner.borrow().layout_option
     }
 
@@ -813,6 +814,8 @@ impl<'a> KeyMap<'a> {
     }
 
     pub(crate) fn write_macro_buffer(&self, offset: usize, data: &[u8]) {
+        #[cfg(all(feature = "_ble", feature = "storage"))]
+        crate::ble_name::macro_written();
         let mut inner = self.inner.borrow_mut();
         let dst = &mut inner.behavior.keyboard_macros.macro_sequences;
         let end = (offset + data.len()).min(dst.len());
@@ -822,6 +825,8 @@ impl<'a> KeyMap<'a> {
     }
 
     pub(crate) fn reset_macro_buffer(&self) {
+        #[cfg(all(feature = "_ble", feature = "storage"))]
+        crate::ble_name::macro_written();
         self.inner.borrow_mut().behavior.keyboard_macros.macro_sequences = [0; MACRO_SPACE_SIZE];
     }
 

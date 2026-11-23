@@ -1,5 +1,20 @@
 # RMK 0.9.0 encoder backport
 
+Unified trackball trial: `KeyMap::layout_option()` is public so the common
+router can read live host options. `PointingProcessor::reset_motion()` clears
+fractional motion without changing the active mode. Storage changes are tests
+only in that trial; existing layout-option persistence is reused.
+See `../README.md` for the scoped firmware behavior.
+
+Bluetooth name trial adds `ble_name.rs`, User18/BN_APPLY, and an appended
+storage key/value. `ble/mod.rs` reads the owned saved name before building
+both GAP and advertising; the identity/bond machinery is unchanged. The current extension loads
+the same saved name before USB construction, keeping all USB identity fields
+except the product string unchanged. The Text prefix is now lowercase `name=`. `storage/mod.rs` validates the reviewed personal layout schema
+before migrating an old build hash, instead of erasing that compatible bank.
+Normal macro buffers retain their semantics and are never modified by BN.
+See `../README.md` and the real-flash migration/keyboard tests.
+
 `rmk/` is the RMK library from stable commit
 `986017d901c7609a9a79167686524f014effa68a`, with upstream
 [PR #1277](https://github.com/rmk-rs/rmk/pull/1277) applied to
@@ -73,3 +88,28 @@ acceptance tests use production constants; the broad upstream suite supplies
 only auto-mouse test capacity (2 instead of disabled 0), without changing the
 production keyboard configuration. This avoids the upstream auto-mouse tests'
 zero-capacity return vectors; it does not add auto-mouse firmware behavior.
+
+## MB1 drag-lock trial
+
+This stock-only trial adds User14 (DD_ON / DD+) and User15 (DD_OFF / DD-).
+`state.rs` owns a volatile latch synchronized with the existing connection lock.
+`channel.rs` overlays it on every mouse report at enqueue time, re-sampling it
+following backpressure. Raw physical button state stays independent. Both
+keyboard and mouse all-up reports are queued on an output/session change.
+`keyboard.rs` dispatches the two tap commands and includes the latch in native
+mouse-condition fork decisions. Pointing, gesture, and wheel processing remain
+unchanged. Normal duplicate-MB1 holder behavior outside DD is not reimplemented.
+No code from the draft #1245 with its newer Macro event positions is copied.
+
+See `docs/drag-lock-mb1.md` and `keyboard/drag_tests.rs`. USB/BLE/profile and queue
+backpressure tests run with `_ble,split` enabled. The host routing suite also
+covers DD with live Vial assignments and all three GT banks plus ST.
+
+## MB1/MB2 independent latch extension
+
+User14/15 retain the left latch and are renamed DD1+/DD1-. User16/17 add
+the right latch as DD2+/DD2-. An AtomicU8 holds only bits 0 and 1; writes
+remain serialized with connection changes. Turning one button off never
+clears the other. Existing raw-button ownership, final report overlay,
+queue resampling and session reset paths are retained.
+See `docs/drag-lock-mb12.md`. No dependency versions or storage schema change.

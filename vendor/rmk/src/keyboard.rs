@@ -910,7 +910,7 @@ impl<'a> Keyboard<'a> {
             // "explicit modifiers" includes the effect of one-shot modifiers, held modifiers keys only
             modifiers: self.resolve_explicit_modifiers(event.pressed),
             leds: LedIndicator::from_bits(LOCK_LED_STATES.load(core::sync::atomic::Ordering::Relaxed)),
-            mouse: MouseButtons::from_bits(self.mouse.report.buttons),
+            mouse: MouseButtons::from_bits(crate::state::drag_buttons(self.mouse.report.buttons)),
         };
 
         // The layer gate is tested against the layer that sourced this key's
@@ -1044,7 +1044,7 @@ impl<'a> Keyboard<'a> {
         let decision_state = StateBits {
             modifiers: self.resolve_explicit_modifiers(event.pressed),
             leds: LedIndicator::from_bits(LOCK_LED_STATES.load(core::sync::atomic::Ordering::Relaxed)),
-            mouse: MouseButtons::from_bits(self.mouse.report.buttons),
+            mouse: MouseButtons::from_bits(crate::state::drag_buttons(self.mouse.report.buttons)),
         };
 
         let fork_states = &self.fork_states;
@@ -1902,6 +1902,38 @@ impl<'a> Keyboard<'a> {
     }
 
     async fn process_user(&mut self, id: u8, event: KeyboardEvent) {
+        #[cfg(all(feature = "_ble", feature = "storage"))]
+        if id == crate::ble_name::APPLY_USER {
+            if event.pressed {
+                if !crate::ble_name::macro_ready() {
+                    warn!("Device name: finish saving macros and wait one second before applying");
+                } else {
+                    match crate::ble_name::from_macro_buffer(&self.keymap.get_macro_sequences()) {
+                        Ok(name) => {
+                            if crate::storage::save_ble_name(name).await {
+                                info!("Device name saved; restart to apply");
+                            } else {
+                                warn!("Device name save failed; previous saved name remains authoritative");
+                            }
+                        }
+                        Err(_) => warn!("Device name rejected: require one ASCII Text macro, 1..16 bytes"),
+                    }
+                }
+            }
+            return;
+        }
+        // User0..9 are BLE/split actions; User10..13 are GT1..3/ST.
+        // DD taps act on press only: key release does not end a drag.
+        if (14..=17).contains(&id) {
+            if event.pressed {
+                crate::state::set_drag_button((id - 14) / 2, id % 2 == 0);
+                self.send_report(Report::MouseReport(usbd_hid::descriptor::MouseReport {
+                    buttons: self.mouse.report.buttons,
+                    x: 0, y: 0, wheel: 0, pan: 0
+                })).await;
+            }
+            return;
+        }
         debug!("Processing user key id: {:?}, event: {:?}", id, event);
 
         #[cfg(feature = "_ble")]
@@ -3093,3 +3125,6 @@ mod test {
 
 #[cfg(all(test, feature = "vial"))]
 mod override_tests;
+
+#[cfg(all(test, feature = "vial"))]
+mod drag_tests;
