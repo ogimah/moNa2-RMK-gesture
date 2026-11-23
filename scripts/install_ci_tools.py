@@ -12,6 +12,16 @@ repo = os.environ['GITHUB_REPOSITORY']
 run = os.environ['GITHUB_RUN_ID']
 check = None
 
+# Hosted-image EC2 mirrors stalled while transferring libclang. Keep Ubuntu's
+# signed repositories, using their official HTTPS endpoints instead.
+for filename, url in [
+    ('/etc/apt/apt-mirrors.txt', 'https://archive.ubuntu.com/ubuntu/'),
+    ('/etc/apt/apt-mirrors-security.txt', 'https://security.ubuntu.com/ubuntu/'),
+]:
+    if Path(filename).exists():
+        subprocess.run(['sudo', 'tee', filename], input=(url + '\n').encode(),
+                       stdout=subprocess.DEVNULL, check=True)
+
 
 def report(phase, elapsed):
     global check
@@ -41,7 +51,10 @@ for phase, args in [
     with log.open('a') as output:
         output.write('\n' + phase + '\n')
         output.flush()
-        proc = subprocess.Popen(['sudo', 'timeout', '--kill-after=10s', '300', 'apt-get', *args],
+        proc = subprocess.Popen(['sudo', 'timeout', '--kill-after=10s', '300', 'apt-get',
+                                 '-o', 'Acquire::http::Timeout=30',
+                                 '-o', 'Acquire::https::Timeout=30',
+                                 '-o', 'Acquire::Retries=2', *args],
                                 stdout=output, stderr=subprocess.STDOUT)
         while proc.poll() is None:
             report(phase, time.monotonic() - started)
