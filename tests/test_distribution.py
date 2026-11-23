@@ -33,6 +33,14 @@ class DistributionTests(unittest.TestCase):
         self.assertFalse(new['storage'].get('clear_layout',False))
         self.assertFalse(new['storage'].get('clear_storage',False))
 
+    def test_unified_bundle_is_uploaded_and_missing_artifacts_fail(self):
+        import fnmatch
+        workflow=(ROOT/'.github/workflows/build.yml').read_text()
+        paths=re.findall(r'path: (dist/[^\s]+)',workflow)
+        self.assertEqual(len(paths),1)
+        self.assertTrue(fnmatch.fnmatch('dist/moNa2-bundle.zip',paths[0]))
+        self.assertIn('if-no-files-found: error',workflow)
+
     def test_feature_code_dependencies_and_vial_are_identical(self):
         baseline=json.loads((ROOT/'tests/fixtures/verified-sha256.json').read_text())
         for name in ['src/gesture.rs','src/pointingproccontroller.rs','src/central.rs','src/peripheral.rs','vial.json','Cargo.toml','Cargo.lock','rust-toolchain.toml','memory.x']:
